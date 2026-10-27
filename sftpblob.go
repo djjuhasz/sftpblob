@@ -148,17 +148,13 @@ func (b *bucket) ErrorCode(err error) gcerrors.ErrorCode {
 }
 
 // path returns the full path for a key
-func (b *bucket) path(key string) (string, error) {
-	path := filepath.Join(b.dir, key)
-	return path, nil
+func (b *bucket) path(key string) string {
+	return filepath.Join(b.dir, key)
 }
 
 // forKey returns the full path, os.FileInfo, and attributes for key.
 func (b *bucket) forKey(key string) (string, os.FileInfo, error) {
-	path, err := b.path(key)
-	if err != nil {
-		return "", nil, err
-	}
+	path := b.path(key)
 	info, err := b.sftpClient.Stat(path)
 	if err != nil {
 		return "", nil, pathError("stat", path, err)
@@ -294,10 +290,7 @@ func (r *reader) As(i interface{}) bool { return false }
 
 // NewTypedWriter implements driver.NewTypedWriter.
 func (b *bucket) NewTypedWriter(ctx context.Context, key string, contentType string, opts *driver.WriterOptions) (driver.Writer, error) {
-	path, err := b.path(key)
-	if err != nil {
-		return nil, err
-	}
+	path := b.path(key)
 	if err := b.sftpClient.MkdirAll(filepath.Dir(path)); err != nil {
 		return nil, pathError("mkdir", filepath.Dir(path), err)
 	}
@@ -388,10 +381,7 @@ type object struct {
 
 // Delete implements driver.Delete.
 func (b *bucket) Delete(ctx context.Context, key string, opts *driver.DeleteOptions) error {
-	path, err := b.path(key)
-	if err != nil {
-		return err
-	}
+	path := b.path(key)
 	info, err := b.sftpClient.Stat(path)
 	if err != nil {
 		return pathError("stat", path, err)
