@@ -450,7 +450,7 @@ func TestErrorAs(t *testing.T) {
 	}
 	var pe *os.PathError
 	if !b.ErrorAs(err, &pe) {
-		t.Skipf("error %T does not unwrap to *os.PathError", err)
+		t.Fatalf("ErrorAs(*os.PathError) = false for error %T", err)
 	}
 	if pe.Path == "" {
 		t.Error("PathError has empty path")

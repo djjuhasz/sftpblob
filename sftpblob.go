@@ -92,7 +92,7 @@ func openBucket(u *url.URL, opts *Options) (driver.Bucket, error) {
 	dir := addTrailingSlash(u.Path)
 	info, err := sftpClient.Stat(dir)
 	if err != nil {
-		return nil, err
+		return nil, pathError("stat", dir, err)
 	}
 	if !info.IsDir() {
 		return nil, fmt.Errorf("%s is not a directory", dir)
@@ -128,9 +128,19 @@ func (b *bucket) Close() error {
 	return err
 }
 
+// pathError wraps err in an *os.PathError, since pkg/sftp returns bare errors
+// (e.g. os.ErrNotExist) that carry no operation or path.
+func pathError(op, path string, err error) error {
+	var perr *os.PathError
+	if err == nil || errors.As(err, &perr) {
+		return err
+	}
+	return &os.PathError{Op: op, Path: path, Err: err}
+}
+
 func (b *bucket) ErrorCode(err error) gcerrors.ErrorCode {
 	switch {
-	case os.IsNotExist(err):
+	case errors.Is(err, os.ErrNotExist):
 		return gcerrors.NotFound
 	default:
 		return gcerrors.Unknown
@@ -151,10 +161,10 @@ func (b *bucket) forKey(key string) (string, os.FileInfo, error) {
 	}
 	info, err := b.sftpClient.Stat(path)
 	if err != nil {
-		return "", nil, err
+		return "", nil, pathError("stat", path, err)
 	}
 	if info.IsDir() {
-		return "", nil, os.ErrNotExist
+		return "", nil, pathError("stat", path, os.ErrNotExist)
 	}
 	return path, info, nil
 }
@@ -171,7 +181,7 @@ func (b *bucket) ListPaged(ctx context.Context, opts *driver.ListOptions) (*driv
 
 	entries, err := b.sftpClient.ReadDir(root)
 	if err != nil {
-		return nil, err
+		return nil, pathError("readdir", root, err)
 	}
 
 	for _, entry := range entries {
@@ -201,8 +211,8 @@ func (b *bucket) As(i interface{}) bool {
 
 // As implements driver.ErrorAs.
 func (b *bucket) ErrorAs(err error, i interface{}) bool {
-	if perr, ok := err.(*os.PathError); ok {
-		if p, ok := i.(**os.PathError); ok {
+	if p, ok := i.(**os.PathError); ok {
+		if perr, ok := errors.AsType[*os.PathError](err); ok {
 			*p = perr
 			return true
 		}
@@ -230,7 +240,7 @@ func (b *bucket) NewRangeReader(ctx context.Context, key string, offset, length 
 	}
 	f, err := b.sftpClient.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, pathError("open", path, err)
 	}
 	if opts.BeforeRead != nil {
 		if err := opts.BeforeRead(func(interface{}) bool { return false }); err != nil {
@@ -289,12 +299,12 @@ func (b *bucket) NewTypedWriter(ctx context.Context, key string, contentType str
 		return nil, err
 	}
 	if err := b.sftpClient.MkdirAll(filepath.Dir(path)); err != nil {
-		return nil, err
+		return nil, pathError("mkdir", filepath.Dir(path), err)
 	}
 	//f, err := b.sftpClient.Create(path)
 	f, err := b.sftpClient.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC)
 	if err != nil {
-		return nil, err
+		return nil, pathError("open", path, err)
 	}
 	if opts.BeforeWrite != nil {
 		if err := opts.BeforeWrite(func(interface{}) bool { return false }); err != nil {
@@ -316,13 +326,14 @@ type writer struct {
 }
 
 func (w *writer) Write(p []byte) (n int, err error) {
-	return w.f.Write(p)
+	n, err = w.f.Write(p)
+	return n, pathError("write", w.path, err)
 }
 
 func (w *writer) Close() error {
 	err := w.f.Close()
 	if err != nil {
-		return err
+		return pathError("close", w.path, err)
 	}
 
 	// Check if the write was cancelled.
@@ -343,7 +354,7 @@ func (b *bucket) Copy(ctx context.Context, dstKey, srcKey string, opts *driver.C
 	}
 	f, err := b.sftpClient.Open(srcPath)
 	if err != nil {
-		return err
+		return pathError("open", srcPath, err)
 	}
 	defer f.Close()
 
@@ -383,7 +394,7 @@ func (b *bucket) Delete(ctx context.Context, key string, opts *driver.DeleteOpti
 	}
 	info, err := b.sftpClient.Stat(path)
 	if err != nil {
-		return err
+		return pathError("stat", path, err)
 	}
 
 	obj := &object{
@@ -416,11 +427,15 @@ func (b *bucket) delete(obj *object) error {
 		b.sftpClient.Remove(dummyFile)
 
 		// then delete dir if empty
-		return b.sftpClient.RemoveDirectory(obj.path)
+		return pathError("rmdir", obj.path, b.sftpClient.RemoveDirectory(obj.path))
 	}
 
 	// delete file
-	return b.sftpClient.Remove(obj.path)
+	if err := b.sftpClient.Remove(obj.path); err != nil {
+		return pathError("remove", obj.path, err)
+	}
+
+	return nil
 }
 
 func (b *bucket) SignedURL(ctx context.Context, key string, opts *driver.SignedURLOptions) (string, error) {
