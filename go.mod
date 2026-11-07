@@ -5,9 +5,9 @@ go 1.26.0
 toolchain go1.27.3
 
 require (
-	github.com/pkg/sftp v1.13.6
+	github.com/pkg/sftp v1.13.12
 	gocloud.dev v0.47.0
-	golang.org/x/crypto v0.56.0
+	golang.org/x/crypto v0.58.0
 )
 
 require (
@@ -23,9 +23,9 @@ require (
 	go.opentelemetry.io/otel/sdk v1.46.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.46.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
-	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/api v0.297.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260904194346-d0f1323225a4 // indirect
