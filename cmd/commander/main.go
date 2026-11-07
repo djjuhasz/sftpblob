@@ -10,7 +10,7 @@ import (
 	"gocloud.dev/blob"
 
 	// Import the blob packages we want to be able to open.
-	_ "github.com/rukavina/sftpblob"
+	_ "github.com/djjuhasz/sftpblob"
 	_ "gocloud.dev/blob/fileblob"
 )
 

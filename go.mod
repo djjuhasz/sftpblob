@@ -1,8 +1,8 @@
-module github.com/rukavina/sftpblob
+module github.com/djjuhasz/sftpblob
 
 go 1.26.0
 
-toolchain go1.26.10
+toolchain go1.27.3
 
 require (
 	github.com/pkg/sftp v1.13.6
